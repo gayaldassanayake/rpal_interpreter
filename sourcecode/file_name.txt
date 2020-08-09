@@ -1,0 +1,9 @@
+let 
+.= 
+..<ID:x> 
+..gamma 
+...<ID:Isinteger> 
+...<INT:3> 
+.gamma 
+..<ID:Print> 
+..<ID:x>
