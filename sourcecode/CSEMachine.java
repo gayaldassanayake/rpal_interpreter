@@ -58,15 +58,16 @@ class Environment {
  * Takes control structures as input and outputs the result
  */
 public class CSEMachine {
+  private int envcount;
   private ArrayList<ArrayList<ControlElement>> controlStructures;
   private ArrayList<ControlElement> control;
   private Stack<ControlElement> stack = new Stack<>();
   private ArrayList<Environment> env = new ArrayList<>();
 
   /**
-   * nitialize the cse
+   * initialize the cse
    * 
-   * @param controlStructures
+   * @param controlStructures controlStructures
    */
   CSEMachine(ArrayList<ArrayList<ControlElement>> controlStructures) {
     this.controlStructures = controlStructures;
@@ -76,6 +77,8 @@ public class CSEMachine {
     this.stack.push(initial);
     Environment initialenv = new Environment("");
     this.env.add(initialenv);
+
+    envcount = 1;
   }
 
   /**
@@ -85,7 +88,7 @@ public class CSEMachine {
    * @return current control element
    */
   public ControlElement getCurrent(String key) {
-    for (int i = 0; i < env.size(); i++) {
+    for(int i= env.size()-1; i>=0; i--){
       if (env.get(i).getKey().equals(key))
         return env.get(i).getBoundEle();
     }
@@ -99,9 +102,9 @@ public class CSEMachine {
    * @return arraylist of control elements
    */
   public ArrayList<ControlElement> getTuple(String key) {
-    for (int i = 0; i < env.size(); i++) {
-      if (env.get(i).getKey().equals(key))
-        return env.get(i).getBoundEleList();
+    for (Environment environment : env) {
+      if (environment.getKey().equals(key))
+        return environment.getBoundEleList();
     }
     return null;
   }
@@ -109,29 +112,29 @@ public class CSEMachine {
   /**
    * Print functionality
    * 
-   * @param element
+   * @param element control element to be printed
    * @return String
    */
   public String tuplePrinter(ControlElement element) {
-    String str = "";
+    StringBuilder str = new StringBuilder();
     if (element.getValue().equals("tuple")) {
-      str += "(";
+      str.append("(");
       for (int i = 0; i < element.getElements().size(); i++) {
         if (i > 0)
-          str += ",";
-        str += tuplePrinter(element.getElements().get(i));
+          str.append(",");
+        str.append(tuplePrinter(element.getElements().get(i)));
       }
-      str += ")";
+      str.append(")");
     } else
-      str += element.getValue();
+      str.append(element.getValue());
 
-    return str;
+    return str.toString();
   }
 
   /**
    * return true if the given string can be parsed to int
    * 
-   * @param integer
+   * @param integer value to be validated as an integer
    * @return boolean
    */
   public boolean integerValidator(String integer) {
@@ -146,7 +149,7 @@ public class CSEMachine {
   /**
    * return true if the given string can be parsed to boolean
    * 
-   * @param bool
+   * @param bool boolean to be validated
    * @return boolean
    */
   public boolean booleanValidator(String bool) {
@@ -178,34 +181,36 @@ public class CSEMachine {
 
       if (type == NodeType.IDENTIFIER) {
         // Isinteger functionality
-        if (value.equals("Isinteger")) {
-          ControlElement element = stack.pop();
+        switch (value) {
+          case "Isinteger": {
+            ControlElement element = stack.pop();
 
-          boolean valid = integerValidator(element.getValue());
-          stack.push(new ControlElement(Boolean.toString(valid), NodeType.BOOLEAN));
+            boolean valid = integerValidator(element.getValue(env));
+            stack.push(new ControlElement(Boolean.toString(valid), NodeType.BOOLEAN));
 
-        } // is boolean functionality
-        else if (value.equals("Istruthvalue")) {
-          ControlElement element = stack.pop();
+          }
+          case "Istruthvalue":{
+            ControlElement element = stack.pop();
 
-          boolean valid = booleanValidator(element.getValue());
-          stack.push(new ControlElement(Boolean.toString(valid), NodeType.BOOLEAN));
-        } // Stem of a string
-        else if (value.equals("Stem")) {
-          ControlElement element = stack.peek();
+            boolean valid = booleanValidator(element.getValue(env));
+            stack.push(new ControlElement(Boolean.toString(valid), NodeType.BOOLEAN));
+          }
+          case "Stem": {
+            ControlElement element = stack.peek();
 
-          element.setValue(element.getValue().substring(0, 1));
-        } // Stern of a string
-        else if (value.equals("Stern")) {
-          ControlElement element = stack.peek();
+            element.setValue(element.getValue(env).substring(0, 1));
+          }
+          case "Stern": {
+            ControlElement element = stack.peek();
 
-          element.setValue(element.getValue().substring(1));
-        } // Concaternate two strings
+            element.setValue(element.getValue(env).substring(1));
+          }
+        }
         if (value.equals("Conc")) {
           ControlElement element1 = stack.pop();
           ControlElement element2 = stack.pop();
 
-          element1.setValue(element1.getValue() + element2.getValue());
+          element1.setValue(element1.getValue(env) + element2.getValue());
           stack.push(element1);
         } else {
           stack.push(current);
@@ -217,169 +222,217 @@ public class CSEMachine {
         stack.push(current);
       } else if (type == NodeType.NONTERMINAL) {
         try {
-          if (value.equals("lambda")) {
-            stack.push(current);
-          } else if (value.equals("gamma")) {
-            // apply (rator,rand)
-            if (stack.peek().getValue().equals("lambda") && stack.peek().getType() == NodeType.NONTERMINAL) {
-              ControlElement lambda = stack.pop();
+          switch (value) {
+            case "lambda":
+              stack.push(current);
+              break;
+            case "gamma":
+              // apply (rator,rand)
+              if (stack.peek().getValue().equals("lambda") && stack.peek().getType() == NodeType.NONTERMINAL) {
+                ControlElement lambda = stack.pop();
 
-              ControlElement ce = new ControlElement(Integer.toString(lambda.getEnv()), NodeType.ENVIRONMENT);
+                ControlElement ce = new ControlElement(Integer.toString(envcount), NodeType.ENVIRONMENT);
+                envcount++;
 
-              ControlElement boundEle = stack.pop();
+                ControlElement boundEle = stack.pop();
 
-              if (lambda.getBoundVar() != null)
-                env.add(new Environment(lambda.getBoundVar(), boundEle));
-              else { // more than 1 bound variable.
-                ArrayList<String> boundVars = lambda.getBoundVars();
-                for (int i = 0; i < boundVars.size(); i++) {
-                  env.add(new Environment(boundVars.get(i), boundEle.getElements().get(i)));
+                if (lambda.getBoundVar() != null)
+                  env.add(new Environment(lambda.getBoundVar(), boundEle));
+                else { // more than 1 bound variable.
+                  ArrayList<String> boundVars = lambda.getBoundVars();
+                  for (int i = 0; i < boundVars.size(); i++) {
+                    env.add(new Environment(boundVars.get(i), boundEle.getElements().get(i)));
+                  }
                 }
+
+                stack.push(ce);
+                control.add(ce);
+                control.addAll(controlStructures.get(lambda.getEnv()));
+
+              } // recursion y star
+              else if (stack.peek().getValue().equals("ystar") && stack.peek().getType() == NodeType.NONTERMINAL) {
+                stack.pop();
+                ControlElement lambda = stack.pop();
+                stack.push(new ControlElement("rec", lambda.getBoundVar(), lambda.getEnv(), NodeType.NONTERMINAL));
+
+              } //recursion f
+              else if (stack.peek().getValue().equals("rec") && stack.peek().getType() == NodeType.NONTERMINAL) {
+                ControlElement rec = stack.peek();
+                control.add(new ControlElement("gamma", NodeType.NONTERMINAL));
+                control.add(new ControlElement("gamma", NodeType.NONTERMINAL));
+
+                stack.push(new ControlElement("lambda", rec.getBoundVar(), rec.getEnv(), NodeType.NONTERMINAL));
+
+              } // tuple
+              else if (stack.peek().getValue().equals("tuple") && stack.peek().getType() == NodeType.STRING) {
+                ControlElement tuple = stack.pop();
+                int index = Integer.parseInt(stack.pop().getValue(env));
+                ControlElement element = tuple.getElements().get(index);
+
+                stack.push(element);
+
+              } // Print
+              else if (stack.peek().getValue().equals("Print") && stack.peek().getType() == NodeType.IDENTIFIER) {
+                stack.pop();
+                ControlElement top = stack.pop();
+
+                System.out.println(tuplePrinter(top));
+
+                stack.push(new ControlElement("dummy", NodeType.NONTERMINAL));
               }
+              break;
+            case "beta":
+              if (stack.peek().getType() == NodeType.BOOLEAN) {
+                ControlElement result = stack.pop();
+                control.remove(control.size() - 1);
+                control.remove(control.size() - 1);
 
-              stack.push(ce);
-              control.add(ce);
-              control.addAll(controlStructures.get(lambda.getEnv()));
-
-            } // recursion
-            else if (stack.peek().getValue() == "ystar" && stack.peek().getType() == NodeType.NONTERMINAL) {
-              stack.pop();
-              ControlElement lambda = stack.pop();
-              stack.push(new ControlElement("rec", lambda.getBoundVar(), lambda.getEnv(), NodeType.NONTERMINAL));
-
-            } //recursion f
-            else if (stack.peek().getValue() == "rec" && stack.peek().getType() == NodeType.NONTERMINAL) {
-              ControlElement rec = stack.peek();
-              control.add(new ControlElement("gamma", NodeType.NONTERMINAL));
-              control.add(new ControlElement("gamma", NodeType.NONTERMINAL));
-
-              stack.push(new ControlElement("lambda", rec.getBoundVar(), rec.getEnv(), NodeType.NONTERMINAL));
-
-            } // Print
-            else if (stack.peek().getValue().equals("Print") && stack.peek().getType() == NodeType.IDENTIFIER) {
-              stack.pop();
-              ControlElement top = stack.pop();
-
-              System.out.println(tuplePrinter(top));
-
-              stack.push(new ControlElement("dummy", NodeType.NONTERMINAL));
-            }
-          } // if condition
-          else if (value.equals("beta")) {
-            if (stack.peek().getType() == NodeType.BOOLEAN) {
-              ControlElement result = stack.pop();
-              control.remove(control.size() - 1);
-              control.remove(control.size() - 1);
-
-              if (result.getValue().equals("true")) {
-                control.addAll(controlStructures.get(current.getIfIndex()));
-                controlStructures.remove(current.getIfIndex() + 1);
+                if (result.getValue().equals("true")) {
+                  control.addAll(controlStructures.get(current.getIfIndex()));
+//                  controlStructures.remove(current.getIfIndex()  + 1);
+//                  iterations++;
+                } else {
+                  int temp = current.getIfIndex();
+                  control.addAll(controlStructures.get(current.getIfIndex() + 1));
+//                  controlStructures.remove(current.getIfIndex());
+                }
               } else {
-                control.addAll(controlStructures.get(current.getIfIndex() + 1));
-                controlStructures.remove(current.getIfIndex());
+                throw new Exception("beta should recieve a boolean");
               }
-            } else
-              throw new Exception("beta should recieve a boolean");
-
-          } // tuples 
-          else if (value.equals("tau")) {
-            ArrayList<ControlElement> elements = new ArrayList<>();
-            for (int i = 0; i < current.getIfIndex(); i++) {
-              elements.add(stack.pop());
-            }
-            stack.push(new ControlElement("tuple", elements, NodeType.STRING));
-          } else if (value.equals("aug")) {
-            ArrayList<ControlElement> elements = new ArrayList<>();
-            ControlElement tuple = stack.pop();
-            ControlElement element = stack.pop();
-            if (tuple.getValue() == "nil") {
-              elements.add(element);
+              break;
+            case "tau": {
+              ArrayList<ControlElement> elements = new ArrayList<>();
+              for (int i = 0; i < current.getIfIndex(); i++) {
+                elements.add(stack.pop());
+              }
               stack.push(new ControlElement("tuple", elements, NodeType.STRING));
-            } else {
-              tuple.getElements().add(element);
-              stack.push(tuple);
+              break;
             }
+            case "aug": {
+              ArrayList<ControlElement> elements = new ArrayList<>();
+              ControlElement tuple = stack.pop();
+              ControlElement element = stack.pop();
+              if (tuple.getValue().equals("nil")) {
+                elements.add(element);
+                stack.push(new ControlElement("tuple", elements, NodeType.STRING));
+              } else {
+                tuple.getElements().add(element);
+                stack.push(tuple);
+              }
 
-            stack.push(new ControlElement("tuple", elements, NodeType.STRING));
+              stack.push(new ControlElement("tuple", elements, NodeType.STRING));
 
-          }  // unary and binary operations
-          else if (value.equals("+")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Integer.toString(first + second), NodeType.INTEGER));
-          } else if (value.equals("-")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Integer.toString(first - second), NodeType.INTEGER));
-          } else if (value.equals("*")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Integer.toString(first * second), NodeType.INTEGER));
-          } else if (value.equals("/")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Integer.toString(first / second), NodeType.INTEGER));
-          } else if (value.equals("neg")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Integer.toString(-first), NodeType.INTEGER));
-          } else if (value.equals("**")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Integer.toString((int) (Math.pow((double) (first), (double) second))),
-                NodeType.INTEGER));
-          } else if (value.equals("or")) {
-            ControlElement firstEle = stack.pop();
-            ControlElement secondEle = stack.pop();
-            if (firstEle.getType() != NodeType.BOOLEAN || secondEle.getType() != NodeType.BOOLEAN)
-              throw new Exception("Need booleans for or");
-            Boolean first = firstEle.getValue() == "true" ? true : false;
-            Boolean second = secondEle.getValue() == "true" ? true : false;
+              break;
+            }
+            case "+": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Integer.toString(first + second), NodeType.INTEGER));
+              break;
+            }
+            case "-": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Integer.toString(first - second), NodeType.INTEGER));
+              break;
+            }
+            case "*": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Integer.toString(first * second), NodeType.INTEGER));
+              break;
+            }
+            case "/": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue());
+              stack.push(new ControlElement(Integer.toString(first / second), NodeType.INTEGER));
+              break;
+            }
+            case "neg": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Integer.toString(-first), NodeType.INTEGER));
+              break;
+            }
+            case "**": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Integer.toString((int) (Math.pow((double) (first), (double) second))),
+                      NodeType.INTEGER));
+              break;
+            }
+            case "or": {
+              ControlElement firstEle = stack.pop();
+              ControlElement secondEle = stack.pop();
+              if (firstEle.getType() != NodeType.BOOLEAN || secondEle.getType() != NodeType.BOOLEAN)
+                throw new Exception("Need booleans for or");
+              Boolean first = firstEle.getValue(env).equals("true");
+              Boolean second = secondEle.getValue(env).equals("true");
 
-            stack.push(new ControlElement(Boolean.toString(first || second), NodeType.BOOLEAN));
+              stack.push(new ControlElement(Boolean.toString(first || second), NodeType.BOOLEAN));
 
-          } else if (value.equals("&")) {
-            ControlElement firstEle = stack.pop();
-            ControlElement secondEle = stack.pop();
-            if (firstEle.getType() != NodeType.BOOLEAN || secondEle.getType() != NodeType.BOOLEAN)
-              throw new Exception("Need booleans for &");
-            Boolean first = firstEle.getValue() == "true" ? true : false;
-            Boolean second = secondEle.getValue() == "true" ? true : false;
+              break;
+            }
+            case "&": {
+              ControlElement firstEle = stack.pop();
+              ControlElement secondEle = stack.pop();
+              if (firstEle.getType() != NodeType.BOOLEAN || secondEle.getType() != NodeType.BOOLEAN)
+                throw new Exception("Need booleans for &");
+              Boolean first = firstEle.getValue(env).equals("true");
+              Boolean second = secondEle.getValue(env).equals("true");
 
-            stack.push(new ControlElement(Boolean.toString(first && second), NodeType.BOOLEAN));
+              stack.push(new ControlElement(Boolean.toString(first && second), NodeType.BOOLEAN));
 
-          } else if (value.equals("not")) {
-            ControlElement firstEle = stack.pop();
-            if (firstEle.getType() != NodeType.BOOLEAN)
-              throw new Exception("Need booleans for not");
-            Boolean first = firstEle.getValue() == "true" ? true : false;
+              break;
+            }
+            case "not": {
+              ControlElement firstEle = stack.pop();
+//              if (firstEle.getType() != NodeType.BOOLEAN)
+//                throw new Exception("Need booleans for not");
+              boolean first = firstEle.getValue(env).equals("true");
 
-            stack.push(new ControlElement(Boolean.toString(!first), NodeType.BOOLEAN));
-          } else if (value.equals("gr")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Boolean.toString(first > second), NodeType.BOOLEAN));
-          } else if (value.equals("ge")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Boolean.toString(first >= second), NodeType.BOOLEAN));
-          } else if (value.equals("ls")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Boolean.toString(first < second), NodeType.BOOLEAN));
-          } else if (value.equals("le")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Boolean.toString(first <= second), NodeType.BOOLEAN));
-          } else if (value.equals("eq")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Boolean.toString(first == second), NodeType.BOOLEAN));
-          } else if (value.equals("ne")) {
-            int first = Integer.parseInt(stack.pop().getValue());
-            int second = Integer.parseInt(stack.pop().getValue());
-            stack.push(new ControlElement(Boolean.toString(first != second), NodeType.BOOLEAN));
-          } else {
-            stack.push(current);
+              stack.push(new ControlElement(Boolean.toString(!first), NodeType.BOOLEAN));
+              break;
+            }
+            case "gr": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Boolean.toString(first > second), NodeType.BOOLEAN));
+              break;
+            }
+            case "ge": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Boolean.toString(first >= second), NodeType.BOOLEAN));
+              break;
+            }
+            case "ls": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Boolean.toString(first < second), NodeType.BOOLEAN));
+              break;
+            }
+            case "le": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Boolean.toString(first <= second), NodeType.BOOLEAN));
+              break;
+            }
+            case "eq": {
+              String temp = stack.pop().getValue(env);
+              int first = Integer.parseInt(temp);
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Boolean.toString(first == second), NodeType.BOOLEAN));
+              break;
+            }
+            case "ne": {
+              int first = Integer.parseInt(stack.pop().getValue(env));
+              int second = Integer.parseInt(stack.pop().getValue(env));
+              stack.push(new ControlElement(Boolean.toString(first != second), NodeType.BOOLEAN));
+              break;
+            }
+            default:
+              stack.push(current);
+              break;
           }
 
         } catch (Exception e) {
@@ -390,9 +443,11 @@ public class CSEMachine {
         try {
           ControlElement env = stack.pop();
           if (!env.getValue().equals(value)) {
-            throw new Exception("Inconsistant envs");
+            throw new Exception("Inconsistent envs");
           }
           stack.push(top);
+
+          this.env.remove(this.env.size()-1);
         } catch (Exception e) {
         }
       }
@@ -400,10 +455,10 @@ public class CSEMachine {
 
     // uncomment to view the final stack
     
-    // if (stack.isEmpty())
-    // System.out.println("empty stack!");
-    // else
-    // System.out.println(stack.peek().getValue());
+//     if (stack.isEmpty())
+//     System.out.println("empty stack!");
+//     else
+//     System.out.println(stack.peek().getValue());
   }
 
 }

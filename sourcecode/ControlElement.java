@@ -47,6 +47,14 @@ public class ControlElement {
         return this.value;
     }
 
+    public String getValue(ArrayList<Environment> env) {
+        for(int i= env.size()-1; i>=0; i--){
+            if (env.get(i).getKey().equals(this.getValue()))
+                return env.get(i).getBoundEle().getValue();
+        }
+        return this.value;
+    }
+
     public void setValue(String value) {
         this.value = value;
     }

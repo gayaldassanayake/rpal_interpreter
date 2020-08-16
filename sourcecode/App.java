@@ -7,25 +7,26 @@ public class App {
     public static void main(String[] args) throws Exception {
         String fileName = args[0];
         System.out.println("Output of the above program is:");
+
         // create the AST from the input
         ASTGenerator astgen = new ASTGenerator();
         SyntaxTree ast = astgen.createAST(fileName);
 
         // uncomment to view the AST
-        // ast.printTree
+//         ast.printTree();
 
         // create the ST from the AST
         STGenerator stgen = new STGenerator();
         stgen.createST(ast);
 
         // uncomment to view the ST
-        // ast.printTree
+//         ast.printTree();
 
-        // Generate the control Stuctures
+        // Generate the control structures
         ControlStructGenerator csg = new ControlStructGenerator();
         ArrayList<ArrayList<ControlElement>> cstruct = csg.preOrderTraverseHelper(ast);
-        // uncomment to view the Control Structs
-        // csg.printCS();
+        // uncomment to view the Control Structures
+//         csg.printCS();
 
         // Create and run the CSE machine with control structures as input
         CSEMachine csemachine = new CSEMachine(cstruct);
